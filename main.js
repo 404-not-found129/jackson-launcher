@@ -92,7 +92,7 @@ function state() {
   return {
     dest: DEST, env: ENV, log: log.slice(-30), version: app.getVersion(), user: USER,
     busy: !!running || queue.length > 0,
-    sessions: [...sessions.entries()].map(([id, s]) => ({ id, title: s.title, folder: s.folder, live: !!s.proc })),
+    sessions: [...sessions.entries()].filter(([, s]) => s.visible).map(([id, s]) => ({ id, title: s.title, folder: s.folder, live: !!s.proc })),
     projects: PROJECTS.map(p => {
       const r = RECIPES[p.folder] || {};
       const j = jobs[p.folder];
@@ -103,6 +103,7 @@ function state() {
         confirm: r.confirm || null, inputs: r.inputs || null, after: r.after || null, pickFolder: !!r.pickFolder,
         launch: r.launch ? { type: r.launch.type, label: r.launch.label || 'Launch' } : null,
         setupError: records[p.folder]?.setup === 'failed' ? records[p.folder].error : null,
+        hasLog: !!jobLogs[p.folder],
       };
     }),
   };
@@ -113,20 +114,50 @@ function state() {
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07|\r/g;
 const PW_PROMPT = /(\[sudo\] password for [^:\n]*:|^Password:|password for \S+:)\s*$/im;
 
-function startTerminal({ cmd, cwd, folder, title, answers = [], job, env = {} }) {
+// Installs run hidden: their output is kept (for "Details" if something fails) but no terminal
+// is shown. App launches that are terminal programs, and guided setups, get a visible tab.
+const LOG_MAX = 400000;
+const jobLogs = {};   // folder -> output of the last install/setup
+const PROMPTISH = /(\?|:|\]|\)|>)\s*$/;
+
+function startTerminal({ cmd, cwd, folder, title, answers = [], job, env = {}, hidden = !!job }) {
   const id = ++sessionSeq;
   const proc = spawn('script', ['-qfec', `stty cols 120 rows 32 2>/dev/null; ${cmd}`, '/dev/null'], {
     cwd, detached: true, env: childEnv({ TERM: 'xterm-256color', COLORTERM: 'truecolor', JACKSON_LAUNCHER: '1', ...env }),
   });
-  const s = { proc, folder, title, cancelled: false };
+  const s = { proc, folder, title, cancelled: false, visible: !hidden, buf: '' };
   s.kill = () => { try { process.kill(-proc.pid, 'SIGTERM'); } catch { try { proc.kill('SIGTERM'); } catch {} } };
+  s.reveal = () => {
+    if (s.visible) return;
+    s.visible = true;
+    send('term-open', { id, title, folder, focus: true });
+    send('term-data', { id, data: s.buf });
+    pushState();
+  };
   sessions.set(id, s);
-  send('term-open', { id, title, folder, focus: !job });
+  if (s.visible) send('term-open', { id, title, folder, focus: true });
   let tail = '';
   let pwWaiting = false;
+  let quiet = null;
+  const emit = text => {
+    s.buf = (s.buf + text).slice(-LOG_MAX);
+    if (s.visible) send('term-data', { id, data: text });
+  };
+  // A hidden install that stops at a question we don't know how to answer would wait forever:
+  // after 20s of silence at something that looks like a prompt, show it so you can answer.
+  const watchQuiet = () => {
+    clearTimeout(quiet);
+    if (s.visible || !job) return;
+    quiet = setTimeout(() => {
+      if (s.proc && !pwWaiting && PROMPTISH.test(tail.trimEnd() + ' ') ) {
+        s.reveal();
+        if (jobs[job]) { jobs[job].phase = 'Needs your answer in the terminal below'; pushState(); }
+      }
+    }, 20000);
+  };
   proc.stdout.on('data', d => {
     const text = d.toString();
-    send('term-data', { id, data: text });
+    emit(text);
     tail = (tail + text.replace(ANSI, '')).slice(-500);
     const lines = tail.split('\n').map(l => l.trim()).filter(Boolean);
     if (job && lines.length) { jobs[job].msg = lines[lines.length - 1].slice(0, 90); pushState(); }
@@ -143,16 +174,31 @@ function startTerminal({ cmd, cwd, folder, title, answers = [], job, env = {} })
     for (const [re, ans] of answers) {
       if (re.test(tail)) { tail = ''; proc.stdin.write(ans + '\n'); break; }
     }
+    watchQuiet();
   });
-  proc.stderr.on('data', d => send('term-data', { id, data: d.toString() }));
+  proc.stderr.on('data', d => emit(d.toString()));
   const done = new Promise(res => proc.on('close', rawCode => {
+    clearTimeout(quiet);
     const code = s.cancelled ? 130 : rawCode;
     s.proc = null;
-    send('term-data', { id, data: `\r\n\x1b[2m[${code === 0 ? 'finished' : 'exited with ' + code}]\x1b[0m\r\n` });
-    send('term-exit', { id, code }); pushState(); res(code);
+    if (job) jobLogs[job] = ((jobLogs[job] || '') + `\n$ ${cmd}\n` + s.buf).slice(-LOG_MAX);
+    if (s.visible) {
+      send('term-data', { id, data: `\r\n\x1b[2m[${code === 0 ? 'finished' : 'exited with ' + code}]\x1b[0m\r\n` });
+      send('term-exit', { id, code });
+    } else sessions.delete(id);
+    pushState(); res(code);
   }));
   pushState();
   return { id, done };
+}
+
+// Open a read-only tab with saved text (setup details, crash output).
+function showText(folder, title, text) {
+  const dir = path.join(process.env.XDG_CACHE_HOME || path.join(HOME, '.cache'), 'jackson-launcher', 'logs');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${folder}-${Date.now()}.txt`);
+  fs.writeFileSync(file, String(text || '(no output)'));
+  startTerminal({ cmd: `cat ${shq(file)}; rm -f ${shq(file)}`, cwd: HOME, folder, title });
 }
 
 // Password: asked in the app's own dialog, kept in memory only while one install runs, never saved.
@@ -191,6 +237,7 @@ async function pump() {
   running = queue.shift();
   const { kind, folder } = running;
   setJob(folder, { state: 'running', phase: 'Starting', pct: 0 });
+  jobLogs[folder] = '';
   try {
     if (kind === 'install') { await download(folder); await setup(folder, running.inputs); }
     else if (kind === 'download') await download(folder);
@@ -269,7 +316,7 @@ async function setup(folder, inputs, isUpdate) {
       const t = startTerminal({ cmd: pkgCmd(need), cwd: dir, folder, title: `${folder}: packages`, job: folder });
       const code = await t.done;
       if (code) {
-        const msg = code === 130 ? 'Setup cancelled. Click Finish setup to try again.' : `Couldn't install ${need.join(', ')}. See the terminal tab.`;
+        const msg = code === 130 ? 'Setup cancelled. Click Finish setup to try again.' : `Couldn't install ${need.join(', ')}. Click Details to see what happened.`;
         records[folder] = { setup: 'failed', error: msg }; saveRecords();
         throw new Error(msg);
       }
@@ -283,7 +330,7 @@ async function setup(folder, inputs, isUpdate) {
     const t = startTerminal({ cmd: st.cmd, cwd: dir, folder, title: `${folder}: setup`, answers: st.answers, job: folder });
     const code = await t.done;
     if (code && (!st.optional || code === 130)) {
-      const msg = code === 130 ? 'Setup cancelled. Click Finish setup to try again.' : `Setup stopped (exit ${code}). See the terminal tab for details.`;
+      const msg = code === 130 ? 'Setup cancelled. Click Finish setup to try again.' : `Setup stopped (exit ${code}). Click Details to see what happened.`;
       records[folder] = { setup: 'failed', error: msg }; saveRecords();
       throw new Error(msg);
     }
@@ -319,8 +366,8 @@ async function getApk(folder) {
 // Show a problem in the terminal drawer so it isn't silently lost.
 function showProblem(folder, title, text) {
   addLog(`${folder}: ${title}`);
-  const body = String(text || '').trim().split('\n').slice(-60).join('\n');
-  startTerminal({ cmd: `printf '%s\\n' ${shq(body || '(no output)')} ${shq('')} ${shq(title)}`, cwd: HOME, folder, title: `${folder}: problem` });
+  const body = String(text || '').trim().split('\n').slice(-80).join('\n');
+  showText(folder, `${folder}: problem`, `${body || '(no output)'}\n\n${title}\n`);
 }
 const shq = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
@@ -376,6 +423,7 @@ ipcMain.handle('act', async (_e, { action, folder, inputs, dest }) => {
     case 'update': return enqueue('update', folder);
     case 'apk': return enqueue('apk', folder);
     case 'launch': return launch(folder);
+    case 'details': return showText(folder, `${folder}: setup details`, jobLogs[folder] || 'No setup output saved yet. Run setup again to see it.');
     case 'open': return shell.openPath(path.join(DEST, folder));
     case 'github': return shell.openExternal(`https://github.com/${USER}/${encodeURIComponent(BY[folder].repo)}`);
     case 'remove': {

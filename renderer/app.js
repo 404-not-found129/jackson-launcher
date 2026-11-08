@@ -64,14 +64,15 @@ function actions(p, big) {
   if (busy(p)) {
     const pct = j.pct == null ? null : Math.round(j.pct * 100);
     const label = j.state === 'queued' ? 'Waiting in line' : (j.phase || 'Working');
-    return `<div class="prog" data-showterm="${f}" title="Show the terminal"><div class="bar ${pct == null || j.phase?.startsWith('Setting') || j.phase?.startsWith('Installing') ? 'ind' : ''}"><b style="width:${pct || 0}%"></b></div><small><span>${esc(label)}${j.msg && j.state !== 'queued' ? ' · ' + esc(j.msg) : ''}</span><span>${pct == null ? '' : pct + '%'}</span></small></div>`;
+    return `<div class="prog"><div class="bar ${pct == null || j.phase?.startsWith('Setting') || j.phase?.startsWith('Installing') ? 'ind' : ''}"><b style="width:${pct || 0}%"></b></div><small><span>${esc(label)}${j.msg && j.state !== 'queued' ? ' · ' + esc(j.msg) : ''}</span><span>${pct == null ? '' : pct + '%'}</span></small></div>`;
   }
-  const err = j && j.state === 'error' ? `<div class="err" title="${esc(j.error)}">${esc((j.error || '').slice(0, 90))}</div>` : '';
+  const details = p.hasLog ? ` <button class="linkbtn" data-act="details" data-f="${f}">Details</button>` : '';
+  const err = j && j.state === 'error' ? `<div class="err" title="${esc(j.error)}">${esc((j.error || '').slice(0, 90))}${details}</div>` : '';
   if (p.status === 'missing') {
     return `${err}<button class="btn ${p.blocked ? '' : 'lime'}" data-act="install" data-f="${f}">${p.blocked ? 'Download' : err ? 'Try again' : 'Install'}</button>${big ? `<span class="meta">${size(p.kb)}</span>` : ''}`;
   }
   if (p.status === 'needs-setup') {
-    return `${err || (p.setupError ? `<div class="err">${esc(p.setupError)}</div>` : '')}<button class="btn lime" data-act="setup" data-f="${f}">Finish setup</button><span class="sp"></span><button class="btn icon" data-more="${f}" aria-label="More">⋯</button>`;
+    return `${err || (p.setupError ? `<div class="err">${esc(p.setupError)}${details}</div>` : '')}<button class="btn lime" data-act="setup" data-f="${f}">Finish setup</button><span class="sp"></span><button class="btn icon" data-more="${f}" aria-label="More">⋯</button>`;
   }
   const main = p.launch && !p.blocked ? `<button class="btn lime" data-act="launch" data-f="${f}">${esc(p.launch.label)}</button>` : `<button class="btn" data-act="open" data-f="${f}">Open folder</button>`;
   return `${err}<span class="ok">✓ ${p.blocked ? 'Downloaded' : 'Ready'}</span><span class="sp"></span>${main}<button class="btn icon" data-more="${f}" aria-label="More">⋯</button>`;
@@ -111,8 +112,8 @@ async function onAction(action, folder, btn) {
   btn.disabled = true;
   await act(action, { folder });
   // Launch/Open can be clicked again; Install/Setup buttons are replaced by progress anyway
-  if (['launch', 'open', 'github'].includes(action)) setTimeout(() => { btn.disabled = false; }, 800);
-  if (action === 'launch' && p.launch?.type === 'term') openDrawer(true);
+  if (['launch', 'open', 'github', 'details'].includes(action)) setTimeout(() => { btn.disabled = false; }, 800);
+  if ((action === 'launch' && p.launch?.type === 'term') || action === 'details') openDrawer(true);
 }
 
 function openMenu(btn) {
@@ -215,6 +216,9 @@ function showTermFor(folder) {
   openDrawer(true);
 }
 function renderTabs() {
+  // The terminal only appears when something needs it: a terminal app, a guided setup,
+  // a question an install is waiting on, or Details/problem output. Installs themselves stay hidden.
+  $('#drawer').hidden = terms.size === 0;
   const html = `<button class="tab ${activeTab === 'log' ? 'on' : ''}" data-tab="log">Activity</button>` +
     [...terms.entries()].map(([id, t]) => `<span class="tab ${activeTab === id ? 'on' : ''}" data-tab="${id}"><i class="dot ${t.live ? 'live' : ''}"></i>${esc(t.title)}<button class="x" data-close="${id}" aria-label="Close">×</button></span>`).join('');
   setHTML($('#tabs'), html);

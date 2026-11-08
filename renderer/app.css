@@ -47,3 +47,6 @@ main{grid-column:2}
 #pw input:focus{border-color:var(--lime)}
 #pw .fine{font-size:12px;color:var(--dim);margin:10px 0 0}
 dialog .warn{border-left:3px solid #ffb224;padding:8px 12px;background:#2a2410;border-radius:4px;color:#f2e2b0}
+.drawer[hidden]{display:none}
+.linkbtn{background:none;border:0;padding:0 0 0 6px;color:var(--ink);text-decoration:underline;text-underline-offset:2px;font:inherit;cursor:pointer}
+.linkbtn:hover{color:var(--lime)}
