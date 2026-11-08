@@ -371,6 +371,8 @@ function integrate() {
   // Runs from an AppImage or an installed copy; skipped when started with `npm start` during development.
   const appimage = process.env.APPIMAGE || (app.isPackaged ? process.execPath : null);
   if (!appimage || process.platform !== 'linux') return;
+  // Installed by a package manager (e.g. the AUR package): the package ships its own menu entry.
+  if (!process.env.APPIMAGE && /^\/(opt|usr)\//.test(process.execPath)) return;
   const data = process.env.XDG_DATA_HOME || path.join(HOME, '.local/share');
   const icon = path.join(data, 'icons/hicolor/512x512/apps/jackson-launcher.png');
   const entry = path.join(data, 'applications/jackson-launcher.desktop');
