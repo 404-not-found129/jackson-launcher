@@ -1,0 +1,50 @@
+{
+  "name": "jackson-launcher",
+  "productName": "Jackson Launcher",
+  "version": "2.0.0",
+  "description": "Install and set up Jackson's projects in one click",
+  "author": "Jackson <215424551+404-not-found129@users.noreply.github.com>",
+  "homepage": "https://github.com/404-not-found129",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.404-not-found129.jackson-launcher",
+    "productName": "Jackson Launcher",
+    "artifactName": "JacksonLauncher-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "recipes.js",
+      "renderer/**",
+      "build/icon.png",
+      "node_modules/@xterm/**"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "tar.gz"
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "executableName": "jackson-launcher",
+      "synopsis": "One-click install and setup for Jackson's projects",
+      "syncDesktopName": true
+    }
+  },
+  "desktopName": "jackson-launcher.desktop"
+}

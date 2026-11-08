@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'">
+<title>Jackson Launcher</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..125,400..900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.6" height="2.6" fill="#f4efe1"/><path d="M0 0v2.6" stroke="#15140f" stroke-width="1.05"/></pattern></defs></svg>
+<aside>
+  <div class="logo"><div class="mk">J/</div><div><b>JACKSON</b><b>LAUNCHER</b><span>v<span id="ver"></span></span></div></div>
+  <nav id="nav"></nav>
+  <div class="side-foot">
+    <div class="folder"><div class="cap">Install folder</div><code id="dest"></code>
+      <div class="row"><button class="chip" id="openDest">Open</button><button class="chip" id="changeDest">Change</button></div></div>
+    <div class="method" id="method"></div>
+  </div>
+</aside>
+<main id="main">
+  <header>
+    <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="color:var(--dim)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search projects" autocomplete="off"></label>
+    <div class="sp"></div>
+    <button class="btn" id="updateAll">Update all</button>
+    <button class="btn lime" id="installAll">Install everything</button>
+  </header>
+  <div class="wrap">
+    <section class="hero" id="hero"></section>
+    <div class="sec-h"><h2 id="secTitle">All projects</h2><span id="secCount"></span></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</main>
+
+<section class="drawer" id="drawer" data-open="false">
+  <div class="dbar">
+    <button class="dtoggle" id="dToggle" aria-label="Show or hide the terminal"><span class="chev">▴</span> Terminal</button>
+    <div class="tabs" id="tabs"></div>
+  </div>
+  <div class="dbody" id="dbody"><ol class="actlog" id="log"></ol></div>
+</section>
+
+<div class="menu" id="menu" hidden></div>
+
+<dialog id="dlg">
+  <h3 id="dTitle"></h3>
+  <p id="dText"></p>
+  <div id="dFields"></div>
+  <div class="row"><button class="btn" id="dNo">Cancel</button><button class="btn lime" id="dYes">OK</button></div>
+</dialog>
+
+<dialog id="pw">
+  <div class="lock">🔒</div>
+  <h3>Password needed</h3>
+  <p id="pwText"></p>
+  <input id="pwIn" type="password" autocomplete="off" spellcheck="false" placeholder="Your login password">
+  <p class="fine">Used once for this setup, then forgotten. It goes straight to <code>sudo</code> on this computer.</p>
+  <div class="row"><button class="btn" id="pwNo">Cancel setup</button><button class="btn lime" id="pwYes">Continue</button></div>
+</dialog>
+
+<script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+<script src="icons.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
