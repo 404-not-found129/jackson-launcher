@@ -51,6 +51,18 @@ const pkgCmd = pk => ({
   dnf: `sudo dnf install -y ${pk.join(' ')}`,
 })[ENV.pm];
 
+// Environment for everything the launcher starts: the user's own, minus what Electron adds
+// (those make GTK/Qt apps behave differently), plus ~/.local/bin, where installers put commands.
+function childEnv(extra = {}) {
+  const e = { ...process.env };
+  for (const k of Object.keys(e)) if (/^(ELECTRON_|CHROME_|GOOGLE_)/.test(k)) delete e[k];
+  delete e.NO_AT_BRIDGE;
+  if (e.ORIGINAL_XDG_CURRENT_DESKTOP) { e.XDG_CURRENT_DESKTOP = e.ORIGINAL_XDG_CURRENT_DESKTOP; delete e.ORIGINAL_XDG_CURRENT_DESKTOP; }
+  const localBin = path.join(HOME, '.local/bin');
+  if (!(e.PATH || '').split(':').includes(localBin)) e.PATH = `${localBin}:${e.PATH || '/usr/bin:/bin'}`;
+  return { ...e, ...extra };
+}
+
 // ---------------------------------------------------------------- window + events
 let win;
 const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
@@ -104,7 +116,7 @@ const PW_PROMPT = /(\[sudo\] password for [^:\n]*:|^Password:|password for \S+:)
 function startTerminal({ cmd, cwd, folder, title, answers = [], job, env = {} }) {
   const id = ++sessionSeq;
   const proc = spawn('script', ['-qfec', `stty cols 120 rows 32 2>/dev/null; ${cmd}`, '/dev/null'], {
-    cwd, detached: true, env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', JACKSON_LAUNCHER: '1', ...env },
+    cwd, detached: true, env: childEnv({ TERM: 'xterm-256color', COLORTERM: 'truecolor', JACKSON_LAUNCHER: '1', ...env }),
   });
   const s = { proc, folder, title, cancelled: false };
   s.kill = () => { try { process.kill(-proc.pid, 'SIGTERM'); } catch { try { proc.kill('SIGTERM'); } catch {} } };
@@ -200,7 +212,7 @@ async function pump() {
 
 function runGit(args, folder, cwd) {
   return new Promise((res, rej) => {
-    const p = spawn('git', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    const p = spawn('git', args, { cwd, env: childEnv({ GIT_TERMINAL_PROMPT: '0' }) });
     let tail = '';
     p.stderr.on('data', d => {
       const t = d.toString(); tail = (tail + t).slice(-400);
@@ -304,15 +316,46 @@ async function getApk(folder) {
   fs.renameSync(out + '.part', out);
 }
 
-function launch(folder) {
+// Show a problem in the terminal drawer so it isn't silently lost.
+function showProblem(folder, title, text) {
+  addLog(`${folder}: ${title}`);
+  const body = String(text || '').trim().split('\n').slice(-60).join('\n');
+  startTerminal({ cmd: `printf '%s\\n' ${shq(body || '(no output)')} ${shq('')} ${shq(title)}`, cwd: HOME, folder, title: `${folder}: problem` });
+}
+const shq = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+async function launch(folder) {
   const r = RECIPES[folder] || {};
   const dir = path.join(DEST, folder);
   const L = r.launch;
-  if (!L) return shell.openPath(dir);
-  if (L.type === 'open') return shell.openPath(path.join(dir, L.path));
+  if (!fs.existsSync(dir)) return showProblem(folder, "isn't downloaded. Click Install first.", '');
+  if (!L) { const err = await shell.openPath(dir); if (err) showProblem(folder, "Couldn't open the folder", err); return; }
+  if (L.type === 'url') { await shell.openExternal(L.url); return; }
+  if (L.type === 'open') {
+    const target = path.join(dir, L.path);
+    if (!fs.existsSync(target)) return showProblem(folder, `Can't find ${L.path}`, 'Try Update, or Remove and Install it again.');
+    const err = await shell.openPath(target);
+    if (err) showProblem(folder, `Couldn't open ${L.path}`, err);
+    return;
+  }
   if (L.type === 'gui') {
-    const p = spawn('sh', ['-c', L.cmd], { cwd: dir, detached: true, stdio: 'ignore' });
-    p.on('error', () => {}); p.unref();
+    // GUI apps run on their own, but keep their output: if one quits with an error soon after
+    // starting, show what it printed instead of failing silently.
+    const logDir = path.join(process.env.XDG_CACHE_HOME || path.join(HOME, '.cache'), 'jackson-launcher', 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    const logFile = path.join(logDir, `${folder}.log`);
+    const out = fs.openSync(logFile, 'w');
+    const started = Date.now();
+    const p = spawn('sh', ['-c', L.cmd], { cwd: dir, detached: true, stdio: ['ignore', out, out], env: childEnv() });
+    fs.closeSync(out);
+    p.on('error', e => showProblem(folder, "Couldn't start it", e.message));
+    p.on('exit', code => {
+      if (code && Date.now() - started < 30000) {
+        let text = ''; try { text = fs.readFileSync(logFile, 'utf8'); } catch {}
+        showProblem(folder, `stopped with an error (exit ${code})`, text);
+      }
+    });
+    p.unref();
     addLog(`Started ${folder}`);
     return;
   }

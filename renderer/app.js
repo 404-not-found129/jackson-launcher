@@ -110,6 +110,8 @@ async function onAction(action, folder, btn) {
   }
   btn.disabled = true;
   await act(action, { folder });
+  // Launch/Open can be clicked again; Install/Setup buttons are replaced by progress anyway
+  if (['launch', 'open', 'github'].includes(action)) setTimeout(() => { btn.disabled = false; }, 800);
   if (action === 'launch' && p.launch?.type === 'term') openDrawer(true);
 }
 

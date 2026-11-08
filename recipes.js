@@ -55,6 +55,7 @@ const PKG = {
   venv: { pacman: 'python', apt: 'python3-venv', dnf: 'python3' },
   docker: { pacman: 'docker', apt: 'docker.io', dnf: 'moby-engine' },
   ollama: { pacman: 'ollama' },
+  wayshot: { pacman: 'grim slurp', apt: 'grim slurp', dnf: 'grim slurp' },
   vm: { pacman: 'virt-manager qemu-guest-agent dialog freerdp iproute2 libnotify openbsd-netcat cdrtools' },
 };
 
@@ -88,7 +89,7 @@ const RECIPES = {
     launch: { type: 'term', cmd: '"$HOME/.local/bin/aura"' },
     after: 'If Docker was just installed, log out and back in once so Aura can use it without a password. The Android APK is in the aura-chatbot-apk folder.',
   },
-  cursor: { launch: { type: 'open', path: 'README.md', label: 'Read' } },
+  cursor: { launch: { type: 'url', url: `https://github.com/${USER}/cursor#readme`, label: 'Read' } },
   'hackintosh-toolkit': {
     needs: ['linux'], guided: true,
     note: 'Walks you through making a macOS installer. One step erases the USB drive you choose.',
@@ -173,14 +174,14 @@ const RECIPES = {
     launch: { type: 'term', cmd: 'bash build.sh', label: 'Build ISO' },
   },
   'math-solver': {
-    needs: ['linux'], pkgs: ['venv', 'tk', 'tesseract'],
+    needs: ['linux'], pkgs: ['venv', 'tk', 'tesseract', 'wayshot'],
     steps: [{ cmd: 'python3 -m venv .venv && .venv/bin/pip install -q --disable-pip-version-check Pillow pyautogui pytesseract numexpr' }],
     launch: { type: 'gui', cmd: '.venv/bin/python math_solver.py' },
   },
   orginzer_script: {
     needs: ['linux'], pkgs: ['tk'],
     launch: { type: 'gui', cmd: 'python3 "orginzer script.py"' },
-    after: 'When you run it, it moves files out of Downloads into your Pictures, Documents and other folders.',
+    after: 'Click Start Watching: new files in Downloads get sorted into Images, Documents, Code and other folders inside Downloads.',
   },
   website: { launch: { type: 'open', path: 'public/index.html', label: 'Open site' } },
   'reshade-shader': {
