@@ -4,16 +4,21 @@ A desktop app for installing my projects. Pick one and click **Install**: it dow
 
 ![Jackson Launcher](renderer/hypr-rice.gif)
 
-## Download
+## Install
 
-Get the latest version from [Releases](https://github.com/404-not-found129/jackson-launcher/releases/latest):
+One command, no sudo:
 
-- **JacksonLauncher-x.y.z.AppImage**: make it executable and double-click it. It adds itself to your app menu the first time it runs.
-  ```bash
-  chmod +x JacksonLauncher-*.AppImage && ./JacksonLauncher-*.AppImage
-  ```
-  If it doesn't start and mentions FUSE, install `fuse2` (Arch: `sudo pacman -S fuse2`) or use the tar.gz.
-- **JacksonLauncher-x.y.z.tar.gz**: unpack it anywhere and run `jackson-launcher` inside. It also adds itself to your app menu.
+```bash
+curl -fsSL https://raw.githubusercontent.com/404-not-found129/jackson-launcher/main/install.sh | bash
+```
+
+It downloads the latest release, checks it against its checksum, installs it to `~/.local/opt/jackson-launcher`, and adds **Jackson Launcher** to your app menu plus a `jackson-launcher` command. Run the same command again to update. To remove it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/404-not-found129/jackson-launcher/main/install.sh | bash -s -- --uninstall
+```
+
+Prefer to download it yourself? Grab the AppImage or tar.gz from [Releases](https://github.com/404-not-found129/jackson-launcher/releases/latest). The AppImage needs `fuse2`.
 
 Linux x86-64 only.
 
