@@ -1,0 +1,32 @@
+# Maintainer: Jackson <215424551+404-not-found129@users.noreply.github.com>
+pkgname=jackson-launcher-bin
+_pkgname=jackson-launcher
+pkgver=2.0.1
+pkgrel=1
+pkgdesc="Install and set up all of Jackson's projects in one click"
+arch=('x86_64')
+url="https://github.com/404-not-found129/jackson-launcher"
+license=('MIT')
+depends=('alsa-lib' 'gtk3' 'nss' 'git' 'util-linux' 'xdg-utils')
+optdepends=('sudo: run project setups that need administrator access')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!strip' '!debug')
+source=("$url/releases/download/v$pkgver/JacksonLauncher-$pkgver.tar.gz"
+        "$_pkgname-$pkgver.png::https://raw.githubusercontent.com/404-not-found129/jackson-launcher/v$pkgver/build/icon.png"
+        "LICENSE-$pkgver::https://raw.githubusercontent.com/404-not-found129/jackson-launcher/v$pkgver/LICENSE"
+        "$_pkgname.desktop")
+sha256sums=('1cf61efe8da2c01dd58d914df6257551ae8333d5f3f5547279238703b70057c9'
+            'eaf628205f8196b31c44744626a78e8a12193a6087a4d14f0f3a0d174d59442a'
+            '18e7658e39561ae2773de26cf8d8e68faf7b72446d62390f778792a4310a670b'
+            '04ec592f06e342592cdca90068ab0531329eae9e8749d1730bddf8ad917dab37')
+
+package() {
+  install -d "$pkgdir/opt/$_pkgname" "$pkgdir/usr/bin"
+  cp -a "JacksonLauncher-$pkgver/." "$pkgdir/opt/$_pkgname/"
+  chmod 4755 "$pkgdir/opt/$_pkgname/chrome-sandbox"
+  ln -s "/opt/$_pkgname/jackson-launcher" "$pkgdir/usr/bin/$_pkgname"
+  install -Dm644 "$_pkgname.desktop" "$pkgdir/usr/share/applications/$_pkgname.desktop"
+  install -Dm644 "$_pkgname-$pkgver.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/$_pkgname.png"
+  install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

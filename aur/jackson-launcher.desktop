@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Jackson Launcher
+Comment=Install and set up Jackson's projects in one click
+Exec=jackson-launcher %U
+Icon=jackson-launcher
+Terminal=false
+Categories=Utility;
+StartupWMClass=jackson-launcher
